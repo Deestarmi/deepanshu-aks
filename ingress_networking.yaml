@@ -100,7 +100,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: myapp.20.253.64.117.nip.io
+  - host: myapp.20.81.27.116.nip.io
     http:
       paths:
       - path: /api(/|$)(.*)
@@ -132,7 +132,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: api.20.253.64.117.nip.io
+  - host: api.20.81.27.116.nip.io
     http:
       paths:
       - path: /
@@ -143,7 +143,7 @@ spec:
             port:
               number: 80
 
-  - host: myapp.20.253.64.117.nip.io
+  - host: myapp.20.81.27.116.nip.io
     http:
       paths:
       - path: /
@@ -170,10 +170,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - myapp.20.253.64.117.nip.io
+    - myapp.20.81.27.116.nip.io
     secretName: tls-secret
   rules:
-  - host: myapp.20.253.64.117.nip.io
+  - host: myapp.20.81.27.116.nip.io
     http:
       paths:
       - path: /
@@ -183,3 +183,55 @@ spec:
             name: frontend-svc
             port:
               number: 80
+---
+### Network Policy ##
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: dev
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend
+  namespace: dev
+spec:
+  podSelector: 
+    matchLabels:
+      app: frontend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+---
+## Allow: backend-api can only be reached from frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 80
