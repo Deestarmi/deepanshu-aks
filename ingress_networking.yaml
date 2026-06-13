@@ -1,5 +1,6 @@
-
-#Sample APP to test routing ##
+# -------------------------
+# FRONTEND
+# -------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,26 +22,30 @@ spec:
         ports:
         - containerPort: 80
         resources:
-          requests: {cpu: "50m", memory: "64Mi"}
-          limits: {cpu: "100m", memory: "128Mi"}
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
 ---
 apiVersion: v1
-kind: Service 
+kind: Service
 metadata:
   name: frontend-svc
   namespace: dev
 spec:
-  type: ClusterIP
-  selector: 
+  selector:
     app: frontend
   ports:
   - port: 80
     targetPort: 80
 ---
-
-# App 2: Backend API
+# -------------------------
+# BACKEND API
+# -------------------------
 apiVersion: apps/v1
-kind: Deployment 
+kind: Deployment
 metadata:
   name: backend-api
   namespace: dev
@@ -60,44 +65,42 @@ spec:
         ports:
         - containerPort: 80
         resources:
-          requests: {cpu: "50m", memory: "64Mi"}
-          limits: {cpu: "100m", memory: "128Mi"}
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
 ---
 apiVersion: v1
-kind: Service 
+kind: Service
 metadata:
   name: backend-api-svc
   namespace: dev
 spec:
-  type: ClusterIP
   selector:
     app: backend-api
   ports:
   - port: 80
     targetPort: 80
 
-## PATH BASED INGRESS
-# / --> frontend , /api -> backend
 ---
+# -------------------------
+# PATH BASED INGRESS
+# -------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: path-based-ingress
   namespace: dev
   annotations:
-    # Tell K8s to use NGINX ingress controller
     kubernetes.io/ingress.class: "nginx"
-    # Strip /api prefix before forwarding to backend
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    # Enable CORS
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-    # Rate limiting (100 requests/minute per IP)
-    nginx.ingress.kubernetes.io/limit-rps: "100"
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
-  - host: "myapp.20.72.161.54.nip.io"   # Replace EXTERNAL_IP
+  - host: myapp.20.253.64.117.nip.io
     http:
       paths:
       - path: /api(/|$)(.*)
@@ -114,11 +117,14 @@ spec:
             name: frontend-svc
             port:
               number: 80
+
 ---
-### HOST BASE INGRESS ####
+# -------------------------
+# HOST BASED INGRESS
+# -------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-metadata: 
+metadata:
   name: host-based-ingress
   namespace: dev
   annotations:
@@ -126,7 +132,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - hosts: "api.20.253.64.117.nip.io"
+  - host: api.20.253.64.117.nip.io
     http:
       paths:
       - path: /
@@ -136,17 +142,22 @@ spec:
             name: backend-api-svc
             port:
               number: 80
-  - hosts:
+
+  - host: myapp.20.253.64.117.nip.io
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
-          service: 
+          service:
             name: frontend-svc
             port:
               number: 80
+
 ---
+# -------------------------
+# TLS INGRESS (ONLY IF SECRET EXISTS)
+# -------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -159,10 +170,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - "myapp.20.253.64.117.nip.io"
+    - myapp.20.253.64.117.nip.io
     secretName: tls-secret
   rules:
-  - hosts: "myapp.20.253.64.117.nip.io"
+  - host: myapp.20.253.64.117.nip.io
     http:
       paths:
       - path: /
