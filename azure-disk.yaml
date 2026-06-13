@@ -1,0 +1,41 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-disk-standard-miku
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Standard_LRS
+reclaimPolicy: Delete
+volumeBindingModle: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-disk-pvc
+  namespace: default
+spec:
+  accessMode:
+  - ReadWriteOnce
+  storageClassName: azure-disk-standard-miku
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: disk-test-Pod
+  namespace: default
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - comtainerPort: 80
+    volumeMounts:
+    - name: azure-disk
+      mountPath: /data
+  volumes:
+  - name: azure-disk
+    persistentVolumeClaim:
+      claimName: my-disk-pvc
