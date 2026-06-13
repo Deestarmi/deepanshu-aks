@@ -1,0 +1,221 @@
+## Namespace ##
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    environment: dev
+
+---
+## Configmap ##
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: dev
+data:
+  APP_ENV: "development"
+  APP_PORT: "8080"
+  DB_HOST: "postgres-svc"
+  DB_PORT: "5432"
+  nginx.conf: |
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://backend:8080
+        }
+      }
+
+### SECRET ###
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: dev
+type: Opaque
+data:
+  DB_PASSWORD:  bXlwYXNzd29yZA==
+  DB_USER: YWRtaW4=
+  API_KEY: c3VwZXJzZWNyZXQxMjM=
+
+## Pod  ##
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-pod
+  namespace: dev
+  labels:
+    app: demo
+    tier: backend
+spec:
+  containers:
+  - name: demo-container
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+    ## Inject configmap as env vars
+    env:
+    - name: APP_ENV
+      valueFrom:
+        configMapKeyRef:
+          name: app-config
+          key: APP_ENV
+    ## Inject Secret as env var ##
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: app-secret
+          key: DB_PASSWORD
+    ## Resource limits - ALWAYS set these in production
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+    ## Liveness probe - k8s restart pod if this fails
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 80
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 80
+      initialDelaySeconds: 5  
+      periodSeconds: 5
+---
+## Deployment ##
+# This is the standward way to deploy stateles apps
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: dev
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  # selector must match template.metadata.labels
+  selector:
+    matchLabels:
+      app: backend
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: backend
+        version: "1.0"
+    spec:
+      containers:
+      - name: backend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secret
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: 
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      securityContext:
+        runAsNonRoot: false # nginx needs root
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable:
+        labelSelector:
+          matchLabels:
+            app: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-nodeport
+  namespace: dev
+spec:
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    nodePort: 30080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-lb
+  namespace: dev
+spec:
+  selector:
+    app: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: Replicaset 
+metadata:
+  name: demo-rs
+  namespace: dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: demo-rs
+  template:
+    metadata:
+      labels:
+        app: demo-rs
+    spec:
+      containers:
+      - name: demo 
+        image: nginx:alpine
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+
+      
+        
+
+
+         
+
+ 
+

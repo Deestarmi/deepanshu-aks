@@ -1,0 +1,116 @@
+
+#Sample APP to test routing ##
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests: {cpu: "50m", memory: "64Mi"}
+          limits: {cpu: "100m", memory: "128Mi"}
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: frontend-svc
+  namespace: dev
+spec:
+  type: ClusterIP
+  selector: 
+    app: frontend
+  ports:
+  - port: 80
+    targetPort: 80
+---
+
+# App 2: Backend API
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: backend-api
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+    spec:
+      containers:
+      - name: api
+        image: kennethreitz/httpbin
+        ports:
+        - containerPort: 80
+        resources:
+          requests: {cpu: "50m", memory: "64Mi"}
+          limits: {cpu: "100m", memory: "128Mi"}
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: backend-api-svc
+  namespace: dev
+spec:
+  type: ClusterIP
+  selector:
+    app: backend-api
+  ports:
+  - port: 80
+    targetPort: 80
+
+## PATH BASED INGRESS
+# / --> frontend , /api -> backend
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-based-ingress
+  namespace: dev
+  annotations:
+    # Tell K8s to use NGINX ingress controller
+    kubernetes.io/ingress.class: "nginx"
+    # Strip /api prefix before forwarding to backend
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Enable CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    # Rate limiting (100 requests/minute per IP)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: "myapp.51.8.60.143.nip.io"   # Replace EXTERNAL_IP
+    http:
+      paths:
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-api-svc
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 80
