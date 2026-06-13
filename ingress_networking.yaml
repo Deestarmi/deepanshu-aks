@@ -97,7 +97,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: "myapp.51.8.60.143.nip.io"   # Replace EXTERNAL_IP
+  - host: "myapp.20.72.161.54.nip.io"   # Replace EXTERNAL_IP
     http:
       paths:
       - path: /api(/|$)(.*)
@@ -111,6 +111,38 @@ spec:
         pathType: Prefix
         backend:
           service:
+            name: frontend-svc
+            port:
+              number: 80
+---
+### HOST BASE INGRESS ####
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: 
+  name: host-based-ingress
+  namespace: dev
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  ingressClassName: nginx
+  rules:
+  - hosts: "api.20.72.161.54.nip.io"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-api-svc
+            port:
+              number: 80
+  - hosts:
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service: 
             name: frontend-svc
             port:
               number: 80
